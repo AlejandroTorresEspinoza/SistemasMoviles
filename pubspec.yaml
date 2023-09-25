@@ -16,6 +16,7 @@ dependencies:
   sqflite: ^2.0.0
   path_provider: ^2.0.2
   crypto: ^3.0.1
+  http: ^0.13.3
 
 dev_dependencies:
   flutter_test:
@@ -29,3 +30,9 @@ flutter:
 
   assets:
     - assets/portada.jpg
+    - assets/portada.jpg
+
+  fonts:
+    - family: LeagueGothic
+      fonts:
+        - asset: assets/fonts/LeagueGothic.ttf

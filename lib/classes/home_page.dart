@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../helpers/database_professor.dart';
 import 'footer.dart';
 import 'list_professor.dart';
+import 'professor_page.dart';
 
 class HomePage extends StatefulWidget {
   final String userName;
@@ -53,7 +54,13 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
             child: PopupMenuButton<String>(
               onSelected: (value) {
-                if (value == 'Perfil') {
+                switch(value) {
+                  case 'Perfil':
+                  // Código para ir al perfil si es necesario
+                    break;
+                  case 'Cerrar sesión':
+                    Navigator.of(context).pushReplacementNamed('/');
+                    break;
                 }
               },
               itemBuilder: (BuildContext context) {
@@ -65,6 +72,17 @@ class _HomePageState extends State<HomePage> {
                         Icon(Icons.person, color: Colors.blue),
                         SizedBox(width: 8),
                         Text('Mi perfil'),
+                      ],
+                    ),
+                  ),
+
+                  PopupMenuItem<String>(
+                    value: 'Cerrar sesión',
+                    child: Row(
+                      children: [
+                        Icon(Icons.exit_to_app, color: Colors.red),  // Icono de salida
+                        SizedBox(width: 8),
+                        Text('Cerrar sesión', style: TextStyle(color: Colors.red)),  // Estilo rojo para destacar
                       ],
                     ),
                   ),
@@ -115,7 +133,16 @@ class _HomePageState extends State<HomePage> {
                     ..._searchResults.map((professor) => ListTile(
                       title: Text(professor['nombres'] + " " + professor['paterno'] + " " + professor['materno']),
                       subtitle: Text(professor['correo']),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProfessorPage(professorName: professor['nombres'] + " " + professor['paterno'] + " " + professor['materno']),
+                          ),
+                        );
+                      },
                     )).toList(),
+
                     SizedBox(height: 20),
                     TextButton(
                       onPressed: () {

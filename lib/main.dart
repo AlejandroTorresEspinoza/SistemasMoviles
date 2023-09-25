@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:quickalert/quickalert.dart';
-import 'package:untitled/models/user.dart';
-import 'package:untitled/helpers/database_helper.dart';
 import 'package:untitled/classes/splash_page.dart';
+import 'package:untitled/helpers/database_user.dart';
 import 'package:untitled/utils/security_utils.dart';
+
 import 'classes/home_page.dart';
 
 void main() => runApp(LoginApp());
@@ -29,88 +29,82 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  String _name = '';  // Nuevo campo
+
+  String _name = '';
   String _username = '';
-  String _institutionalCode = '';  // Nuevo campo
+  String _institutionalCode = '';
   String _password = '';
+
   bool isLoginView = true;
+  bool _isEmailValid = true;
+  bool _isCodeValid = true;
+
+  DatabaseUser dbUser = DatabaseUser();
+
+  void _validateEmail(String email) async {
+    bool isAvailable = await dbUser.isEmailAvailable(email);
+    setState(() {
+      _isEmailValid = isAvailable;
+    });
+  }
+
+  void _validateCode(String code) async {
+    bool isAvailable = await dbUser.isCodeAvailable(code);
+    setState(() {
+      _isCodeValid = isAvailable;
+    });
+  }
 
   void _submitForm() async {
     if (_formKey.currentState!.validate()) {
       String salt = "SomeSaltValue";
       String hashedPassword = generatePasswordHash(_password, salt);
       if (isLoginView) {
-        // Inicio de sesión
-        User? user = await DatabaseHelper.instance.getUser(_username, hashedPassword);
-        if (user == null) {
-          QuickAlert.show(
-            context: context,
-            type: QuickAlertType.warning,
-            title: 'Error',
-            text: 'Correo o contraseña incorrectos.',
-          );
-          return;
-        } else {
+        bool loginSuccess = await dbUser.loginUser(_username, hashedPassword);
+        if (loginSuccess) {
           QuickAlert.show(
             context: context,
             type: QuickAlertType.success,
-            title: 'Éxito',
-            text: 'Inicio de sesión exitoso.',
+            title: 'Inicio exitoso',
+            text: 'Ha iniciado sesión correctamente',
           );
 
-          Future.delayed(Duration(seconds: 2), () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => HomePage(userName: user!.name)),
-            );
-          });
-        }
+          // Redirección al HomePage
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => HomePage(userName: _username)), // Pasas el _username como argumento a HomePage
+          );
 
+        } else {
+          QuickAlert.show(
+            context: context,
+            type: QuickAlertType.error,
+            title: 'Error',
+            text: 'Correo o contraseña inválidos.',
+          );
+        }
       } else {
-        // Registro
-        bool emailAlreadyExists = await DatabaseHelper.instance.emailExists(_username);
-        bool codeAlreadyExists = await DatabaseHelper.instance.institutionalCodeExists(_institutionalCode);
-
-        if (emailAlreadyExists) {
+        bool registrationSuccess = await dbUser.registerUser(_name, _username, _institutionalCode, hashedPassword);
+        if (registrationSuccess) {
           QuickAlert.show(
             context: context,
-            type: QuickAlertType.warning,
-            title: 'Error',
-            text: 'El correo ya está registrado.',
+            type: QuickAlertType.success,
+            title: 'Registro exitoso',
+            text: 'Usuario registrado correctamente',
           );
-          return;
-        }
-
-        if (codeAlreadyExists) {
+        } else {
           QuickAlert.show(
             context: context,
-            type: QuickAlertType.warning,
+            type: QuickAlertType.error,
             title: 'Error',
-            text: 'El código institucional ya está registrado.',
+            text: 'Hubo un problema al registrar el usuario. Inténtalo nuevamente.',
           );
-          return;
         }
-
-        User newUser = User(
-          name: _name,
-          email: _username,
-          institutionalCode: _institutionalCode,
-          password: hashedPassword,
-        );
-
-        await DatabaseHelper.instance.insert(newUser);
-
-        QuickAlert.show(
-          context: context,
-          type: QuickAlertType.success,
-          title: 'Registro exitoso',
-          text: 'Usuario registrado correctamente',
-        );
-
         _formKey.currentState!.reset();
       }
     }
   }
+
 
   Widget _loginForm() {
     return Column(
@@ -178,10 +172,15 @@ class _LoginPageState extends State<LoginPage> {
           ),
           SizedBox(height: 20),
           TextFormField(
-            onChanged: (value) => _username = value,
+            onChanged: (value) {
+              _username = value;
+              _validateEmail(value);
+            },
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'Por favor ingrese su correo electrónico';
+              } else if (!_isEmailValid) {
+                return 'El correo ya está registrado';
               } else if (!value.endsWith("@unmsm.edu.pe")) {
                 return 'Por favor ingrese un correo correspondiente al dominio de la San Marcos';
               } else if (!value.contains("@")) {
@@ -189,21 +188,34 @@ class _LoginPageState extends State<LoginPage> {
               }
               return null;
             },
-            decoration: InputDecoration(labelText: 'Correo', alignLabelWithHint: true),
+            decoration: InputDecoration(
+              labelText: 'Correo',
+              alignLabelWithHint: true,
+              errorText: !_isEmailValid ? 'El correo ya está registrado' : null,
+            ),
           ),
           SizedBox(height: 20),
           TextFormField(
-            onChanged: (value) => _institutionalCode = value,
+            onChanged: (value) {
+              _institutionalCode = value;
+              _validateCode(value);
+            },
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'Por favor ingrese su código institucional';
+              } else if (!_isCodeValid) {
+                return 'El código ya está registrado';
               } else if (!RegExp(r'^\d{8}$').hasMatch(value)) {
                 return 'El código debe contener exactamente 8 dígitos numéricos';
               }
               return null;
             },
             keyboardType: TextInputType.number,
-            decoration: InputDecoration(labelText: 'Código Institucional', alignLabelWithHint: true),
+            decoration: InputDecoration(
+              labelText: 'Código Institucional',
+              alignLabelWithHint: true,
+              errorText: !_isCodeValid ? 'El código ya está registrado' : null,
+            ),
           ),
           SizedBox(height: 20),
           TextFormField(
@@ -240,7 +252,6 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -256,7 +267,7 @@ class _LoginPageState extends State<LoginPage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(  // <-- Añade esto aquí
+        child: SingleChildScrollView(
           child: Form(
             key: _formKey,
             child: Column(
